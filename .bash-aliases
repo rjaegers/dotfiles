@@ -1,0 +1,5 @@
+alias ip='wget -qO- ipinfo.io/ip'
+
+alias ..='cd ..'
+alias ...='cd ../..'
+alias ....='cd ../../..'
