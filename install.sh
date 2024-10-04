@@ -11,3 +11,5 @@ wget -qO- https://github.com/eza-community/eza/releases/latest/download/eza_$(un
 git clone https://github.com/eza-community/eza-themes.git > /dev/null
 mkdir -p ~/.config/eza
 ln -sf "$(pwd)/eza-themes/themes/gruvbox-dark.yml" ~/.config/eza/theme.yml
+
+ln -sf "$(pwd)/.bash-aliases" ~/.bash-aliases
