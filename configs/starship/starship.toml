@@ -2,15 +2,16 @@
 
 format = """
 [](color_orange)\
-$directory\
+$os\
+$username\
 [](bg:color_yellow fg:color_orange)\
-
+$directory\
 [](fg:color_yellow bg:color_aqua)\
 $git_branch\
 $git_status\
 [](fg:color_aqua bg:color_blue)\
 $c\
-$cmake\
+$cpp\
 $rust\
 $golang\
 $nodejs\
@@ -22,6 +23,7 @@ $python\
 [](fg:color_blue bg:color_bg3)\
 $docker_context\
 $conda\
+$pixi\
 [](fg:color_bg3 bg:color_bg1)\
 $time\
 [ ](fg:color_bg1)\
@@ -41,15 +43,52 @@ color_purple = '#b16286'
 color_red = '#cc241d'
 color_yellow = '#d79921'
 
+[os]
+disabled = false
+style = "bg:color_orange fg:color_fg0"
+
+[os.symbols]
+Windows = "󰍲"
+Ubuntu = "󰕈"
+SUSE = ""
+Raspbian = "󰐿"
+Mint = "󰣭"
+Macos = "󰀵"
+Manjaro = ""
+Linux = "󰌽"
+Gentoo = "󰣨"
+Fedora = "󰣛"
+Alpine = ""
+Amazon = ""
+Android = ""
+AOSC = ""
+Arch = "󰣇"
+Artix = "󰣇"
+EndeavourOS = ""
+CentOS = ""
+Debian = "󰣚"
+Redhat = "󱄛"
+RedHatEnterprise = "󱄛"
+Pop = ""
+
+[username]
+show_always = true
+style_user = "bg:color_orange fg:color_fg0"
+style_root = "bg:color_orange fg:color_fg0"
+format = '[ $user ]($style)'
+
 [directory]
-style = "fg:color_fg0 bg:color_orange"
-truncate_to_repo = false
-format = "[$path ]($style)"
+style = "fg:color_fg0 bg:color_yellow"
+format = "[ $path ]($style)"
 truncation_length = 3
 truncation_symbol = "…/"
 
 [directory.substitutions]
-"/workspaces/" = "󰲋 "
+"Documents" = "󰈙 "
+"Downloads" = " "
+"Music" = "󰝚 "
+"Pictures" = " "
+"Developer" = "󰲋 "
 
 [git_branch]
 symbol = ""
@@ -68,13 +107,12 @@ format = '[[ $symbol( $version) ](fg:color_fg0 bg:color_blue)]($style)'
 [c]
 symbol = " "
 style = "bg:color_blue"
-format = '[[ $symbol($version) ](fg:color_fg0 bg:color_blue)]($style)'
-detect_extensions = ['c', 'h', 'cpp', 'hpp']
+format = '[[ $symbol( $version) ](fg:color_fg0 bg:color_blue)]($style)'
 
-[cmake]
-symbol = "△ "
+[cpp]
+symbol = " "
 style = "bg:color_blue"
-format = '[[ $symbol($version) ](fg:color_fg0 bg:color_blue)]($style)'
+format = '[[ $symbol( $version) ](fg:color_fg0 bg:color_blue)]($style)'
 
 [rust]
 symbol = ""
@@ -92,7 +130,7 @@ style = "bg:color_blue"
 format = '[[ $symbol( $version) ](fg:color_fg0 bg:color_blue)]($style)'
 
 [java]
-symbol = " "
+symbol = ""
 style = "bg:color_blue"
 format = '[[ $symbol( $version) ](fg:color_fg0 bg:color_blue)]($style)'
 
@@ -119,6 +157,10 @@ format = '[[ $symbol( $context) ](fg:#83a598 bg:color_bg3)]($style)'
 [conda]
 style = "bg:color_bg3"
 format = '[[ $symbol( $environment) ](fg:#83a598 bg:color_bg3)]($style)'
+
+[pixi]
+style = "bg:color_bg3"
+format = '[[ $symbol( $version)( $environment) ](fg:color_fg0 bg:color_bg3)]($style)'
 
 [time]
 disabled = false

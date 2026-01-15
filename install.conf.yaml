@@ -1,0 +1,13 @@
+- clean: ['~']
+- defaults:
+    link:
+      create: true
+      relink: true
+- link:
+    ~/.bash_profile: configs/bash/bash-profile
+    ~/.bash_aliases: configs/bash/bash-aliases
+    ~/.config/starship.toml: configs/starship/starship.toml
+    ~/.config/eza/theme.yml: eza-themes/themes/gruvbox-dark.yml
+- shell:
+    - sh -c "$(wget -qO- https://starship.rs/install.sh)" -y -f
+    - mkdir -p "$HOME/.local/bin" && wget -qO- https://github.com/eza-community/eza/releases/latest/download/eza_$(uname -m)-unknown-linux-gnu.tar.gz | tar -xzf - -C "$HOME/.local/bin"

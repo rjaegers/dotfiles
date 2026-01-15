@@ -1,4 +1,4 @@
-alias ip='wget -qO- ipinfo.io/ip'
+alias ip='echo $(wget -qO- http://ipinfo.io/ip)'
 
 alias ..='cd ..'
 alias ...='cd ../..'
