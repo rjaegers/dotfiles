@@ -7,6 +7,16 @@
     ~/.config/starship.toml: configs/starship/starship.toml
     ~/.config/eza/theme.yml: eza-themes/themes/gruvbox-dark.yml
 - shell:
-    - [python3 scripts/install-tools.py, Installing Linux tools]
-    - [bash scripts/setup-bash.sh, Configuring Bash]
-    - [bash scripts/install-herdr.sh, Installing Herdr and Herdr Projects]
+    - command: python3 scripts/install-tools.py
+      description: Installing Linux tools and Herdr
+      stdout: true
+      stderr: true
+    - command: bash scripts/setup-bash.sh
+      description: Configuring Bash
+      stdout: true
+      stderr: true
+    - command: bash scripts/install-herdr.sh
+      description: Installing and configuring Herdr Projects
+      stdin: true
+      stdout: true
+      stderr: true

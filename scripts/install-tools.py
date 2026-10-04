@@ -5,9 +5,9 @@ import hashlib
 import json
 import os
 import platform
+import subprocess
 import tarfile
 import tempfile
-import urllib.request
 from pathlib import Path
 
 
@@ -24,9 +24,44 @@ TOOLS = (
 
 
 def download(url):
-    request = urllib.request.Request(url, headers={"User-Agent": "rjaegers-dotfiles"})
-    with urllib.request.urlopen(request, timeout=120) as response:
-        return response.read()
+    with tempfile.TemporaryDirectory() as directory:
+        target = Path(directory) / "download"
+        subprocess.run(
+            ["wget", "-q", "--timeout=120", "--tries=3", "-O", str(target), url],
+            check=True,
+        )
+        return target.read_bytes()
+
+
+def write_binary(name, binary, bin_dir):
+    destination = bin_dir / name
+    with tempfile.NamedTemporaryFile(dir=bin_dir, delete=False) as output:
+        temporary = Path(output.name)
+        try:
+            output.write(binary)
+            output.flush()
+            os.fchmod(output.fileno(), 0o755)
+            os.replace(temporary, destination)
+        finally:
+            temporary.unlink(missing_ok=True)
+
+
+def install_herdr(arch, bin_dir):
+    destination = bin_dir / "herdr"
+    if destination.is_file() and os.access(destination, os.X_OK):
+        print(f"herdr: already installed at {destination}", flush=True)
+        return
+    manifest = json.loads(download("https://herdr.dev/latest.json"))
+    target = f"linux-{arch}"
+    url = manifest["assets"][target]
+    expected = manifest["sha256"][target]
+    if len(expected) != 64 or any(digit not in "0123456789abcdef" for digit in expected.lower()):
+        raise RuntimeError("herdr: invalid release checksum")
+    print(f"herdr: downloading {manifest['version']}", flush=True)
+    binary = download(url)
+    if hashlib.sha256(binary).hexdigest() != expected.lower():
+        raise RuntimeError("herdr: release checksum mismatch")
+    write_binary("herdr", binary, bin_dir)
 
 
 def install(name, repository, asset_pattern, arch, bin_dir):
@@ -66,16 +101,7 @@ def install(name, repository, asset_pattern, arch, bin_dir):
             binary = tar.extractfile(candidates[0])
             if binary is None:
                 raise RuntimeError(f"{name}: cannot read binary from {asset_name}")
-            with tempfile.NamedTemporaryFile(dir=bin_dir, delete=False) as output:
-                temporary = Path(output.name)
-                try:
-                    while chunk := binary.read(1024 * 1024):
-                        output.write(chunk)
-                    output.flush()
-                    os.fchmod(output.fileno(), 0o755)
-                    os.replace(temporary, destination)
-                finally:
-                    temporary.unlink(missing_ok=True)
+            write_binary(name, binary.read(), bin_dir)
 
 
 def main():
@@ -88,6 +114,7 @@ def main():
     bin_dir.mkdir(parents=True, exist_ok=True)
     for tool in TOOLS:
         install(*tool, arch, bin_dir)
+    install_herdr(arch, bin_dir)
 
 
 if __name__ == "__main__":

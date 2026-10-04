@@ -6,10 +6,8 @@ mkdir -p "$bin_dir"
 export PATH="$bin_dir:$PATH"
 
 if [[ ! -x "$bin_dir/herdr" ]]; then
-    installer="$(mktemp)"
-    trap 'rm -f "$installer"' EXIT
-    curl -fsSL https://herdr.dev/install.sh -o "$installer"
-    HERDR_INSTALL_DIR="$bin_dir" sh "$installer"
+    printf 'Herdr binary missing; run the tool installation step first\n' >&2
+    exit 1
 fi
 
 if [[ ! -x "$bin_dir/herdr-projects" ]]; then

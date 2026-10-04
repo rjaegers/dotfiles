@@ -1,4 +1,4 @@
-alias ip='curl -fsSL https://ipinfo.io/ip'
+alias ip='wget -qO- https://ipinfo.io/ip'
 
 alias ..='cd ..'
 alias ...='cd ../..'
