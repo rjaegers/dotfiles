@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import platform
+import shutil
 import subprocess
 import tarfile
 import tempfile
@@ -20,6 +21,18 @@ TOOLS = (
     ("zoxide", "ajeetdsouza/zoxide", "zoxide-{version}-{arch}-unknown-linux-musl.tar.gz"),
     ("dust", "bootandy/dust", "dust-{tag}-{arch}-unknown-linux-gnu.tar.gz"),
     ("delta", "dandavison/delta", "delta-{version}-{arch}-unknown-linux-gnu.tar.gz"),
+)
+
+MACOS_TOOLS = (
+    ("starship", "starship"),
+    ("eza", "eza"),
+    ("bat", "bat"),
+    ("fd", "fd"),
+    ("rg", "ripgrep"),
+    ("zoxide", "zoxide"),
+    ("dust", "dust"),
+    ("delta", "git-delta"),
+    ("wget", "wget"),
 )
 
 
@@ -105,8 +118,16 @@ def install(name, repository, asset_pattern, arch, bin_dir):
 
 
 def main():
-    if platform.system() != "Linux":
-        raise RuntimeError("This dotfiles installer supports Linux only")
+    system = platform.system()
+    if system == "Darwin":
+        missing = [formula for command, formula in MACOS_TOOLS if not shutil.which(command)]
+        if missing:
+            if not shutil.which("brew"):
+                raise RuntimeError("Install Homebrew first: https://brew.sh")
+            subprocess.run(["brew", "install", *missing], check=True)
+        return
+    if system != "Linux":
+        raise RuntimeError(f"Unsupported operating system: {system}")
     arch = platform.machine()
     if arch not in ("x86_64", "aarch64"):
         raise RuntimeError(f"Unsupported Linux architecture: {arch}")

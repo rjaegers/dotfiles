@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [[ "$(uname -s)" == Darwin ]]; then
+    echo "Skipping Linux Herdr setup on macOS"
+    exit 0
+fi
+
 bin_dir="${XDG_BIN_HOME:-$HOME/.local/bin}"
 mkdir -p "$bin_dir"
 export PATH="$bin_dir:$PATH"

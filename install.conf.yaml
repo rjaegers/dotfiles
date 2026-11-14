@@ -8,11 +8,15 @@
     ~/.config/eza/theme.yml: eza-themes/themes/gruvbox-dark.yml
 - shell:
     - command: python3 scripts/install-tools.py
-      description: Installing Linux tools and Herdr
+      description: Installing tools
       stdout: true
       stderr: true
     - command: bash scripts/setup-bash.sh
       description: Configuring Bash
+      stdout: true
+      stderr: true
+    - command: bash scripts/setup-zsh.sh
+      description: Configuring Zsh on macOS
       stdout: true
       stderr: true
     - command: bash scripts/install-herdr.sh
