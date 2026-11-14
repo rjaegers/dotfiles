@@ -25,10 +25,6 @@ executables in the local bin directory are left alone; remove one and rerun
 `./install` to update it. The eza theme and Starship palette use Gruvbox Dark;
 `BAT_THEME` is set to `gruvbox-dark`.
 
-The latest `fd` release is checked before installation; if it cannot start
-(for example, under x86 emulation), the installer tries earlier verified
-releases and uses the newest one that works.
-
 On Linux, Herdr is installed from the checksummed [official release manifest](https://herdr.dev/latest.json)
 and [Herdr Projects](https://github.com/eliasstravik/herdr-projects) is
 installed and configured as a Herdr plugin. This step requires a working
@@ -44,3 +40,7 @@ the old dotfiles-managed `~/.bash_profile` and `~/.bash_aliases` symlinks and
 configures the existing login profile to source `.bashrc`.
 Other existing profile content is preserved. The managed blocks are added
 only once, so rerunning the installer is safe.
+
+The latest `fd` release is checked before installation; if it cannot start
+(for example, under x86 emulation), the installer tries earlier verified
+releases and uses the newest one that works.
