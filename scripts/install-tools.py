@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install verified release binaries for Linux, without system packages."""
+"""Install shell tools and verified Herdr release binaries."""
 
 import hashlib
 import json
@@ -59,13 +59,13 @@ def write_binary(name, binary, bin_dir):
             temporary.unlink(missing_ok=True)
 
 
-def install_herdr(arch, bin_dir):
+def install_herdr(arch, bin_dir, system):
     destination = bin_dir / "herdr"
     if destination.is_file() and os.access(destination, os.X_OK):
         print(f"herdr: already installed at {destination}", flush=True)
         return
     manifest = json.loads(download("https://herdr.dev/latest.json"))
-    target = f"linux-{arch}"
+    target = f"{system}-{arch}"
     url = manifest["assets"][target]
     expected = manifest["sha256"][target]
     if len(expected) != 64 or any(digit not in "0123456789abcdef" for digit in expected.lower()):
@@ -119,23 +119,28 @@ def install(name, repository, asset_pattern, arch, bin_dir):
 
 def main():
     system = platform.system()
+    if system not in ("Darwin", "Linux"):
+        raise RuntimeError(f"Unsupported operating system: {system}")
+    arch = platform.machine()
+    if system == "Darwin" and arch == "arm64":
+        arch = "aarch64"
+    if arch not in ("x86_64", "aarch64"):
+        raise RuntimeError(f"Unsupported {system} architecture: {arch}")
+    bin_dir = Path(os.environ.get("XDG_BIN_HOME", Path.home() / ".local/bin")).expanduser()
+
     if system == "Darwin":
         missing = [formula for command, formula in MACOS_TOOLS if not shutil.which(command)]
         if missing:
             if not shutil.which("brew"):
                 raise RuntimeError("Install Homebrew first: https://brew.sh")
             subprocess.run(["brew", "install", *missing], check=True)
+        bin_dir.mkdir(parents=True, exist_ok=True)
+        install_herdr(arch, bin_dir, "macos")
         return
-    if system != "Linux":
-        raise RuntimeError(f"Unsupported operating system: {system}")
-    arch = platform.machine()
-    if arch not in ("x86_64", "aarch64"):
-        raise RuntimeError(f"Unsupported Linux architecture: {arch}")
-    bin_dir = Path(os.environ.get("XDG_BIN_HOME", Path.home() / ".local/bin")).expanduser()
     bin_dir.mkdir(parents=True, exist_ok=True)
     for tool in TOOLS:
         install(*tool, arch, bin_dir)
-    install_herdr(arch, bin_dir)
+    install_herdr(arch, bin_dir, "linux")
 
 
 if __name__ == "__main__":

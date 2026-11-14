@@ -1,4 +1,6 @@
 import importlib.util
+import hashlib
+import json
 import os
 from pathlib import Path
 import platform
@@ -17,12 +19,17 @@ spec.loader.exec_module(install_tools)
 class ToolInstallationTests(unittest.TestCase):
     def test_macos_installs_only_missing_homebrew_formulae(self):
         installed = {"brew", "starship", "eza", "bat", "fd", "zoxide", "dust"}
-        with (
-            mock.patch.object(install_tools.platform, "system", return_value="Darwin"),
-            mock.patch.object(install_tools.shutil, "which", side_effect=lambda name: name if name in installed else None),
-            mock.patch.object(install_tools.subprocess, "run") as run,
-        ):
-            install_tools.main()
+        with tempfile.TemporaryDirectory() as directory:
+            with (
+                mock.patch.object(install_tools.platform, "system", return_value="Darwin"),
+                mock.patch.object(install_tools.platform, "machine", return_value="arm64"),
+                mock.patch.dict(os.environ, {"XDG_BIN_HOME": directory}),
+                mock.patch.object(install_tools.shutil, "which", side_effect=lambda name: name if name in installed else None),
+                mock.patch.object(install_tools.subprocess, "run") as run,
+                mock.patch.object(install_tools, "install_herdr") as herdr,
+            ):
+                install_tools.main()
+            herdr.assert_called_once_with("aarch64", Path(directory), "macos")
         run.assert_called_once_with(["brew", "install", "ripgrep", "git-delta", "wget"], check=True)
 
     def test_linux_still_installs_verified_tools_and_herdr(self):
@@ -36,7 +43,56 @@ class ToolInstallationTests(unittest.TestCase):
             ):
                 install_tools.main()
             self.assertEqual(install.call_count, len(install_tools.TOOLS))
-            herdr.assert_called_once_with("aarch64", Path(directory))
+            herdr.assert_called_once_with("aarch64", Path(directory), "linux")
+
+    def test_macos_herdr_release_selection_and_checksum(self):
+        binary = b"herdr test binary"
+        checksum = hashlib.sha256(binary).hexdigest()
+        for arch in ("x86_64", "aarch64"):
+            with self.subTest(arch=arch), tempfile.TemporaryDirectory() as directory:
+                target = f"macos-{arch}"
+                manifest = json.dumps({
+                    "version": "test",
+                    "assets": {target: f"https://example.test/{target}"},
+                    "sha256": {target: checksum},
+                }).encode()
+                with mock.patch.object(install_tools, "download", side_effect=[manifest, binary]) as download:
+                    install_tools.install_herdr(arch, Path(directory), "macos")
+                self.assertEqual(download.call_args_list[1].args[0], f"https://example.test/{target}")
+                self.assertEqual((Path(directory) / "herdr").read_bytes(), binary)
+                self.assertTrue(os.access(Path(directory) / "herdr", os.X_OK))
+
+    def test_bad_herdr_checksum_is_rejected(self):
+        manifest = json.dumps({
+            "version": "test",
+            "assets": {"macos-aarch64": "https://example.test/herdr"},
+            "sha256": {"macos-aarch64": "0" * 64},
+        }).encode()
+        with tempfile.TemporaryDirectory() as directory:
+            with mock.patch.object(install_tools, "download", side_effect=[manifest, b"wrong"]):
+                with self.assertRaisesRegex(RuntimeError, "checksum mismatch"):
+                    install_tools.install_herdr("aarch64", Path(directory), "macos")
+            self.assertFalse((Path(directory) / "herdr").exists())
+
+    def test_existing_herdr_is_not_replaced(self):
+        with tempfile.TemporaryDirectory() as directory:
+            binary = Path(directory) / "herdr"
+            binary.write_bytes(b"existing")
+            binary.chmod(0o755)
+            with mock.patch.object(install_tools, "download") as download:
+                install_tools.install_herdr("aarch64", Path(directory), "macos")
+            download.assert_not_called()
+            self.assertEqual(binary.read_bytes(), b"existing")
+
+    def test_unsupported_macos_architecture_fails_before_installing(self):
+        with (
+            mock.patch.object(install_tools.platform, "system", return_value="Darwin"),
+            mock.patch.object(install_tools.platform, "machine", return_value="unknown"),
+            mock.patch.object(install_tools.subprocess, "run") as run,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "Unsupported Darwin architecture"):
+                install_tools.main()
+            run.assert_not_called()
 
     def test_macos_requires_homebrew_for_missing_tools(self):
         with (
@@ -68,7 +124,13 @@ class DotbotIntegrationTests(unittest.TestCase):
             **os.environ,
             "HOME": str(self.home),
             "PATH": f"{bin_dir}:/usr/bin:/bin:/usr/sbin:/sbin",
+            "XDG_BIN_HOME": str(self.home / ".local/bin"),
         }
+        local_bin = self.home / ".local/bin"
+        local_bin.mkdir(parents=True)
+        herdr = local_bin / "herdr"
+        herdr.write_text("#!/bin/sh\nexit 1\n")
+        herdr.chmod(0o755)
 
     def dotbot(self):
         return subprocess.run(
@@ -116,6 +178,14 @@ class DotbotIntegrationTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Incomplete dotfiles block", result.stdout + result.stderr)
         self.assertEqual(zshrc.read_text(), "# BEGIN rjaegers/dotfiles\nexisting content\n")
+
+    def test_existing_herdr_projects_is_configured_on_macos(self):
+        plugin = self.home / ".local/bin/herdr-projects"
+        plugin.write_text('#!/bin/sh\nprintf "%s" "$1" > "$HOME/plugin-argument"\n')
+        plugin.chmod(0o755)
+        result = self.dotbot()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual((self.home / "plugin-argument").read_text(), "configure")
 
 
 if __name__ == "__main__":

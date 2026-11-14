@@ -10,8 +10,8 @@ installation.
 
 On macOS, install [Homebrew](https://brew.sh/) and add it to your PATH first.
 Missing tools, including `wget`, are installed using Homebrew. Both the default Zsh and Bash are
-configured; open a new shell after installation. Herdr setup is Linux-only
-and is skipped on macOS. A Nerd Font is recommended for the prompt and icons.
+configured; open a new shell after installation. A Nerd Font is recommended
+for the prompt and icons.
 
 On Linux, `wget` is required, and tools are installed into
 `${XDG_BIN_HOME:-~/.local/bin}`.
@@ -25,9 +25,13 @@ executables in the local bin directory are left alone; remove one and rerun
 `./install` to update it. The eza theme and Starship palette use Gruvbox Dark;
 `BAT_THEME` is set to `gruvbox-dark`.
 
-On Linux, Herdr is installed from the checksummed [official release manifest](https://herdr.dev/latest.json)
-and [Herdr Projects](https://github.com/eliasstravik/herdr-projects) is
-installed and configured as a Herdr plugin. This step requires a working
+Herdr TUI is installed into `${XDG_BIN_HOME:-~/.local/bin}` on both platforms
+from the checksummed [official release manifest](https://herdr.dev/latest.json).
+On macOS, an existing Herdr Projects installation is configured, but a new one
+is not installed: its original repository no longer contains that plugin.
+On Linux, [Herdr Projects](https://github.com/eliasstravik/herdr-projects) is
+installed and configured as before, though new installations may fail for the
+same reason. This step requires a working
 Herdr installation and may need its server running; if it fails, start Herdr
 and rerun `./install`. It does not create a project or launch an agent.
 The plugin executes its upstream installation script; review the source
