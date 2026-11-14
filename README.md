@@ -20,23 +20,15 @@ The installer provides Starship, eza (`ls`), bat (`cat`), fd (`find`), ripgrep
 (`grep`), zoxide (`cd` via `z`), dust (`du`), and delta (`diff`). Apart from
 the existing `ls` family of aliases, use these tools by their own names rather
 than silently changing standard command semantics. On Linux, release assets are checked
-against GitHub's SHA-256 digests before installation. Already installed
+against GitHub's SHA-256 digests before installation. Except for Herdr, already installed
 executables in the local bin directory are left alone; remove one and rerun
 `./install` to update it. The eza theme and Starship palette use Gruvbox Dark;
 `BAT_THEME` is set to `gruvbox-dark`.
 
-Herdr TUI is installed into `${XDG_BIN_HOME:-~/.local/bin}` on both platforms
-from the checksummed [official release manifest](https://herdr.dev/latest.json).
-On macOS, an existing Herdr Projects installation is configured, but a new one
-is not installed: its original repository no longer contains that plugin.
-On Linux, [Herdr Projects](https://github.com/eliasstravik/herdr-projects) is
-installed and configured as before, though new installations may fail for the
-same reason. This step requires a working
-Herdr installation and may need its server running; if it fails, start Herdr
-and rerun `./install`. It does not create a project or launch an agent.
-The plugin executes its upstream installation script; review the source
-before running the setup on a machine you do not trust. Herdr Projects may
-use its own download tooling internally; this repository's downloads use `wget`.
+Herdr TUI is installed or updated in `${XDG_BIN_HOME:-~/.local/bin}` on both
+platforms using the checksummed [official release manifest](https://herdr.dev/latest.json).
+Rerunning `./install` checks for the latest release. Existing Herdr symlinks
+are not replaced; update their targets separately.
 
 Starship and zoxide load from `~/.bashrc` in interactive Bash shells, so ordinary
 terminal tabs and login shells receive the same setup. The installer removes

@@ -61,15 +61,18 @@ def write_binary(name, binary, bin_dir):
 
 def install_herdr(arch, bin_dir, system):
     destination = bin_dir / "herdr"
-    if destination.is_file() and os.access(destination, os.X_OK):
-        print(f"herdr: already installed at {destination}", flush=True)
-        return
     manifest = json.loads(download("https://herdr.dev/latest.json"))
     target = f"{system}-{arch}"
     url = manifest["assets"][target]
     expected = manifest["sha256"][target]
     if len(expected) != 64 or any(digit not in "0123456789abcdef" for digit in expected.lower()):
         raise RuntimeError("herdr: invalid release checksum")
+    if destination.is_file() and os.access(destination, os.X_OK):
+        if hashlib.sha256(destination.read_bytes()).hexdigest() == expected.lower():
+            print(f"herdr: already up to date at {destination}", flush=True)
+            return
+    if destination.is_symlink():
+        raise RuntimeError(f"herdr: refusing to replace symlink {destination}; update its target manually")
     print(f"herdr: downloading {manifest['version']}", flush=True)
     binary = download(url)
     if hashlib.sha256(binary).hexdigest() != expected.lower():

@@ -69,20 +69,62 @@ class ToolInstallationTests(unittest.TestCase):
             "sha256": {"macos-aarch64": "0" * 64},
         }).encode()
         with tempfile.TemporaryDirectory() as directory:
+            current = Path(directory) / "herdr"
+            current.write_bytes(b"old")
+            current.chmod(0o755)
             with mock.patch.object(install_tools, "download", side_effect=[manifest, b"wrong"]):
                 with self.assertRaisesRegex(RuntimeError, "checksum mismatch"):
                     install_tools.install_herdr("aarch64", Path(directory), "macos")
-            self.assertFalse((Path(directory) / "herdr").exists())
+            self.assertEqual(current.read_bytes(), b"old")
 
-    def test_existing_herdr_is_not_replaced(self):
+    def test_existing_latest_herdr_is_not_replaced(self):
         with tempfile.TemporaryDirectory() as directory:
             binary = Path(directory) / "herdr"
             binary.write_bytes(b"existing")
             binary.chmod(0o755)
-            with mock.patch.object(install_tools, "download") as download:
+            manifest = json.dumps({
+                "version": "test",
+                "assets": {"macos-aarch64": "https://example.test/herdr"},
+                "sha256": {"macos-aarch64": hashlib.sha256(b"existing").hexdigest()},
+            }).encode()
+            with mock.patch.object(install_tools, "download", return_value=manifest) as download:
                 install_tools.install_herdr("aarch64", Path(directory), "macos")
-            download.assert_not_called()
+            download.assert_called_once_with("https://herdr.dev/latest.json")
             self.assertEqual(binary.read_bytes(), b"existing")
+
+    def test_outdated_herdr_is_updated(self):
+        latest = b"latest release"
+        manifest = json.dumps({
+            "version": "test",
+            "assets": {"macos-aarch64": "https://example.test/herdr"},
+            "sha256": {"macos-aarch64": hashlib.sha256(latest).hexdigest()},
+        }).encode()
+        with tempfile.TemporaryDirectory() as directory:
+            binary = Path(directory) / "herdr"
+            binary.write_bytes(b"old release")
+            binary.chmod(0o755)
+            with mock.patch.object(install_tools, "download", side_effect=[manifest, latest]):
+                install_tools.install_herdr("aarch64", Path(directory), "macos")
+            self.assertEqual(binary.read_bytes(), latest)
+            self.assertTrue(os.access(binary, os.X_OK))
+
+    def test_outdated_herdr_symlink_is_not_replaced(self):
+        manifest = json.dumps({
+            "version": "test",
+            "assets": {"macos-aarch64": "https://example.test/herdr"},
+            "sha256": {"macos-aarch64": "0" * 64},
+        }).encode()
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "managed-herdr"
+            target.write_bytes(b"old")
+            target.chmod(0o755)
+            binary = Path(directory) / "herdr"
+            binary.symlink_to(target)
+            with mock.patch.object(install_tools, "download", return_value=manifest):
+                with self.assertRaisesRegex(RuntimeError, "refusing to replace symlink"):
+                    install_tools.install_herdr("aarch64", Path(directory), "macos")
+            self.assertTrue(binary.is_symlink())
+            self.assertEqual(target.read_bytes(), b"old")
 
     def test_unsupported_macos_architecture_fails_before_installing(self):
         with (
@@ -116,7 +158,8 @@ class DotbotIntegrationTests(unittest.TestCase):
         for command, _ in install_tools.MACOS_TOOLS:
             executable = bin_dir / command
             executable.write_text(
-                "#!/bin/sh\nprintf '203.0.113.1\\n'\n" if command == "wget"
+                '#!/bin/sh\nif [ "$1" = "-qO-" ]; then printf "203.0.113.1\\n"; '
+                'else cp "$HOME/manifest.json" "$5"; fi\n' if command == "wget"
                 else "#!/bin/sh\nexit 0\n"
             )
             executable.chmod(0o755)
@@ -131,6 +174,12 @@ class DotbotIntegrationTests(unittest.TestCase):
         herdr = local_bin / "herdr"
         herdr.write_text("#!/bin/sh\nexit 1\n")
         herdr.chmod(0o755)
+        checksum = hashlib.sha256(herdr.read_bytes()).hexdigest()
+        (self.home / "manifest.json").write_text(json.dumps({
+            "version": "test",
+            "assets": {f"macos-{arch}": "https://example.test/herdr" for arch in ("aarch64", "x86_64")},
+            "sha256": {f"macos-{arch}": checksum for arch in ("aarch64", "x86_64")},
+        }))
 
     def dotbot(self):
         return subprocess.run(
@@ -179,13 +228,13 @@ class DotbotIntegrationTests(unittest.TestCase):
         self.assertIn("Incomplete dotfiles block", result.stdout + result.stderr)
         self.assertEqual(zshrc.read_text(), "# BEGIN rjaegers/dotfiles\nexisting content\n")
 
-    def test_existing_herdr_projects_is_configured_on_macos(self):
+    def test_existing_herdr_projects_is_not_run(self):
         plugin = self.home / ".local/bin/herdr-projects"
         plugin.write_text('#!/bin/sh\nprintf "%s" "$1" > "$HOME/plugin-argument"\n')
         plugin.chmod(0o755)
         result = self.dotbot()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual((self.home / "plugin-argument").read_text(), "configure")
+        self.assertFalse((self.home / "plugin-argument").exists())
 
 
 if __name__ == "__main__":

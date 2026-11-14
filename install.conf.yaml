@@ -19,8 +19,3 @@
       description: Configuring Zsh on macOS
       stdout: true
       stderr: true
-    - command: bash scripts/install-herdr.sh
-      description: Installing and configuring Herdr Projects
-      stdin: true
-      stdout: true
-      stderr: true
