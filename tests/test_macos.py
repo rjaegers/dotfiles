@@ -23,7 +23,7 @@ class ToolInstallationTests(unittest.TestCase):
             mock.patch.object(install_tools.subprocess, "run") as run,
         ):
             install_tools.main()
-        run.assert_called_once_with(["brew", "install", "ripgrep", "git-delta"], check=True)
+        run.assert_called_once_with(["brew", "install", "ripgrep", "git-delta", "wget"], check=True)
 
     def test_linux_still_installs_verified_tools_and_herdr(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -59,7 +59,10 @@ class DotbotIntegrationTests(unittest.TestCase):
         bin_dir.mkdir()
         for command, _ in install_tools.MACOS_TOOLS:
             executable = bin_dir / command
-            executable.write_text("#!/bin/sh\nexit 0\n")
+            executable.write_text(
+                "#!/bin/sh\nprintf '203.0.113.1\\n'\n" if command == "wget"
+                else "#!/bin/sh\nexit 0\n"
+            )
             executable.chmod(0o755)
         self.env = {
             **os.environ,
@@ -91,10 +94,11 @@ class DotbotIntegrationTests(unittest.TestCase):
         self.assertEqual(bashrc.read_text().count("# BEGIN rjaegers/dotfiles"), 1)
         for path in (".config/starship.toml", ".config/eza/theme.yml", ".config/rjaegers-dotfiles/bash-aliases"):
             self.assertTrue((self.home / path).is_file())
-        for shell, command in (("zsh", ["zsh", "-ic", "alias ls"]), ("bash", ["bash", "--rcfile", str(bashrc), "-ic", "alias ls"])):
+        for shell, command in (("zsh", ["zsh", "-ic", "alias ls; ip"]), ("bash", ["bash", "--rcfile", str(bashrc), "-ic", "alias ls; ip"])):
             result = subprocess.run(command, env=self.env, text=True, capture_output=True)
             self.assertEqual(result.returncode, 0, f"{shell}: {result.stderr}")
             self.assertIn("eza", result.stdout)
+            self.assertIn("203.0.113.1", result.stdout)
 
     def test_bash_migrates_old_managed_symlinks_on_macos(self):
         (self.home / ".bash_profile").symlink_to(ROOT / "configs/bash/bash-profile")

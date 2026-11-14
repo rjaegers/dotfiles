@@ -32,6 +32,7 @@ MACOS_TOOLS = (
     ("zoxide", "zoxide"),
     ("dust", "dust"),
     ("delta", "git-delta"),
+    ("wget", "wget"),
 )
 
 

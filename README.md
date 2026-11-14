@@ -1,7 +1,7 @@
 # Dotfiles
 
 Run `./install` from this Git checkout on macOS or x86_64/aarch64 Linux.
-Git, Python 3, Bash, curl and network access are required. Dotbot checks out
+Git, Python 3, Bash and network access are required. Dotbot checks out
 the pinned `dotbot` and `eza-themes` submodules and links the Gruvbox Dark
 Starship and eza themes. Existing shell startup files are extended, not replaced.
 An existing
@@ -9,11 +9,11 @@ An existing
 installation.
 
 On macOS, install [Homebrew](https://brew.sh/) and add it to your PATH first.
-Missing tools are installed using Homebrew. Both the default Zsh and Bash are
+Missing tools, including `wget`, are installed using Homebrew. Both the default Zsh and Bash are
 configured; open a new shell after installation. Herdr setup is Linux-only
 and is skipped on macOS. A Nerd Font is recommended for the prompt and icons.
 
-On Linux, `wget` is also required, and tools are installed into
+On Linux, `wget` is required, and tools are installed into
 `${XDG_BIN_HOME:-~/.local/bin}`.
 
 The installer provides Starship, eza (`ls`), bat (`cat`), fd (`find`), ripgrep
