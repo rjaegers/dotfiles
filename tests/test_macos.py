@@ -26,11 +26,24 @@ class ToolInstallationTests(unittest.TestCase):
                 mock.patch.dict(os.environ, {"XDG_BIN_HOME": directory}),
                 mock.patch.object(install_tools.shutil, "which", side_effect=lambda name: name if name in installed else None),
                 mock.patch.object(install_tools.subprocess, "run") as run,
+                mock.patch.object(install_tools, "install") as install,
+                mock.patch.object(install_tools, "install_devcontainer") as devcontainer,
                 mock.patch.object(install_tools, "install_herdr") as herdr,
             ):
                 install_tools.main()
+            install.assert_called_once_with(
+                "copilot",
+                "github/copilot-cli",
+                "copilot-darwin-arm64.tar.gz",
+                "aarch64",
+                Path(directory),
+            )
+            devcontainer.assert_called_once_with(Path(directory))
             herdr.assert_called_once_with("aarch64", Path(directory), "macos")
-        run.assert_called_once_with(["brew", "install", "ripgrep", "git-delta", "wget"], check=True)
+        run.assert_called_once_with(
+            ["brew", "install", "ripgrep", "git-delta", "wget", "gh", "node"],
+            check=True,
+        )
 
     def test_linux_still_installs_verified_tools_and_herdr(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -39,11 +52,58 @@ class ToolInstallationTests(unittest.TestCase):
                 mock.patch.object(install_tools.platform, "machine", return_value="aarch64"),
                 mock.patch.dict(os.environ, {"XDG_BIN_HOME": directory}),
                 mock.patch.object(install_tools, "install") as install,
+                mock.patch.object(install_tools, "install_devcontainer") as devcontainer,
                 mock.patch.object(install_tools, "install_herdr") as herdr,
             ):
                 install_tools.main()
-            self.assertEqual(install.call_count, len(install_tools.TOOLS))
+            self.assertEqual(install.call_count, len(install_tools.TOOLS) + 2)
+            self.assertIn(
+                mock.call(
+                    "gh",
+                    "cli/cli",
+                    "gh_{version}_linux_arm64.tar.gz",
+                    "aarch64",
+                    Path(directory),
+                ),
+                install.call_args_list,
+            )
+            self.assertIn(
+                mock.call(
+                    "copilot",
+                    "github/copilot-cli",
+                    "copilot-linux-arm64.tar.gz",
+                    "aarch64",
+                    Path(directory),
+                ),
+                install.call_args_list,
+            )
+            devcontainer.assert_called_once_with(Path(directory))
             herdr.assert_called_once_with("aarch64", Path(directory), "linux")
+
+    def test_devcontainer_installs_with_npm_prefix(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with (
+                mock.patch.object(install_tools.shutil, "which", return_value="/usr/bin/npm"),
+                mock.patch.object(install_tools.subprocess, "run") as run,
+            ):
+                install_tools.install_devcontainer(Path(directory))
+        run.assert_called_once_with(
+            [
+                "/usr/bin/npm",
+                "install",
+                "--global",
+                "--prefix",
+                directory,
+                "@devcontainers/cli",
+            ],
+            check=True,
+        )
+
+    def test_devcontainer_requires_npm_when_not_already_installed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with mock.patch.object(install_tools.shutil, "which", return_value=None):
+                with self.assertRaisesRegex(RuntimeError, "npm is required"):
+                    install_tools.install_devcontainer(Path(directory))
 
     def test_macos_herdr_release_selection_and_checksum(self):
         binary = b"herdr test binary"
@@ -174,6 +234,10 @@ class DotbotIntegrationTests(unittest.TestCase):
         herdr = local_bin / "herdr"
         herdr.write_text("#!/bin/sh\nexit 1\n")
         herdr.chmod(0o755)
+        for command in ("copilot", "devcontainer"):
+            executable = local_bin / command
+            executable.write_text("#!/bin/sh\nexit 0\n")
+            executable.chmod(0o755)
         checksum = hashlib.sha256(herdr.read_bytes()).hexdigest()
         (self.home / "manifest.json").write_text(json.dumps({
             "version": "test",

@@ -33,6 +33,8 @@ MACOS_TOOLS = (
     ("dust", "dust"),
     ("delta", "git-delta"),
     ("wget", "wget"),
+    ("gh", "gh"),
+    ("npm", "node"),
 )
 
 
@@ -120,6 +122,43 @@ def install(name, repository, asset_pattern, arch, bin_dir):
             write_binary(name, binary.read(), bin_dir)
 
 
+def install_github_cli(arch, bin_dir):
+    release_arch = {"x86_64": "amd64", "aarch64": "arm64"}[arch]
+    install(
+        "gh",
+        "cli/cli",
+        f"gh_{{version}}_linux_{release_arch}.tar.gz",
+        arch,
+        bin_dir,
+    )
+
+
+def install_copilot(system, arch, bin_dir):
+    release_arch = {"x86_64": "x64", "aarch64": "arm64"}[arch]
+    install(
+        "copilot",
+        "github/copilot-cli",
+        f"copilot-{system}-{release_arch}.tar.gz",
+        arch,
+        bin_dir,
+    )
+
+
+def install_devcontainer(bin_dir):
+    destination = bin_dir / "devcontainer"
+    if destination.is_file() and os.access(destination, os.X_OK):
+        print(f"devcontainer: already installed at {destination}", flush=True)
+        return
+    npm = shutil.which("npm")
+    if not npm:
+        raise RuntimeError("devcontainer: npm is required; install Node.js and npm")
+    print("devcontainer: installing @devcontainers/cli", flush=True)
+    subprocess.run(
+        [npm, "install", "--global", "--prefix", str(bin_dir), "@devcontainers/cli"],
+        check=True,
+    )
+
+
 def main():
     system = platform.system()
     if system not in ("Darwin", "Linux"):
@@ -138,11 +177,16 @@ def main():
                 raise RuntimeError("Install Homebrew first: https://brew.sh")
             subprocess.run(["brew", "install", *missing], check=True)
         bin_dir.mkdir(parents=True, exist_ok=True)
+        install_copilot("darwin", arch, bin_dir)
+        install_devcontainer(bin_dir)
         install_herdr(arch, bin_dir, "macos")
         return
     bin_dir.mkdir(parents=True, exist_ok=True)
     for tool in TOOLS:
         install(*tool, arch, bin_dir)
+    install_github_cli(arch, bin_dir)
+    install_copilot("linux", arch, bin_dir)
+    install_devcontainer(bin_dir)
     install_herdr(arch, bin_dir, "linux")
 
 

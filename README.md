@@ -9,21 +9,22 @@ An existing
 installation.
 
 On macOS, install [Homebrew](https://brew.sh/) and add it to your PATH first.
-Missing tools, including `wget`, are installed using Homebrew. Both the default Zsh and Bash are
-configured; open a new shell after installation. A Nerd Font is recommended
-for the prompt and icons.
+Missing tools, including `wget`, `gh`, and Node.js/npm, are installed using
+Homebrew. Both the default Zsh and Bash are configured; open a new shell after
+installation. A Nerd Font is recommended for the prompt and icons.
 
-On Linux, `wget` is required, and tools are installed into
+On Linux, `wget`, Node.js, and npm are required, and tools are installed into
 `${XDG_BIN_HOME:-~/.local/bin}`.
 
 The installer provides Starship, eza (`ls`), bat (`cat`), fd (`find`), ripgrep
-(`grep`), zoxide (`cd` via `z`), dust (`du`), and delta (`diff`). Apart from
-the existing `ls` family of aliases, use these tools by their own names rather
-than silently changing standard command semantics. On Linux, release assets are checked
-against GitHub's SHA-256 digests before installation. Except for Herdr, already installed
-executables in the local bin directory are left alone; remove one and rerun
-`./install` to update it. The eza theme and Starship palette use Gruvbox Dark;
-`BAT_THEME` is set to `gruvbox-dark`.
+(`grep`), zoxide (`cd` via `z`), dust (`du`), delta (`diff`), GitHub CLI
+(`gh`), GitHub Copilot CLI (`copilot`), and Dev Container CLI (`devcontainer`).
+Apart from the existing `ls` family of aliases, use these tools by their own
+names rather than silently changing standard command semantics. On Linux,
+release assets are checked against GitHub's SHA-256 digests before installation.
+Except for Herdr, already installed executables in the local bin directory are
+left alone; remove one and rerun `./install` to update it. The eza theme and
+Starship palette use Gruvbox Dark; `BAT_THEME` is set to `gruvbox-dark`.
 
 Herdr TUI is installed or updated in `${XDG_BIN_HOME:-~/.local/bin}` on both
 platforms using the checksummed [official release manifest](https://herdr.dev/latest.json).
