@@ -8,10 +8,14 @@ profile="$HOME/.bash_profile"
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 
 # An older installation linked .bash_profile directly to the repository.
-if [[ -L "$profile" && "$(readlink -f "$profile")" == "$repo/configs/bash/bash-profile" ]]; then
+resolve_link() {
+    python3 -c 'import pathlib, sys; print(pathlib.Path(sys.argv[1]).resolve())' "$1"
+}
+
+if [[ -L "$profile" && "$(resolve_link "$profile")" == "$repo/configs/bash/bash-profile" ]]; then
     rm "$profile"
 fi
-if [[ -L "$HOME/.bash_aliases" && "$(readlink -f "$HOME/.bash_aliases")" == "$repo/configs/bash/bash-aliases" ]]; then
+if [[ -L "$HOME/.bash_aliases" && "$(resolve_link "$HOME/.bash_aliases")" == "$repo/configs/bash/bash-aliases" ]]; then
     rm "$HOME/.bash_aliases"
 fi
 
@@ -29,7 +33,7 @@ append_block() {
     printf '\n%s\n%s\n%s\n' "$begin" "$content" "$end" >> "$path"
 }
 
-append_block "$rc" 'if [[ -z "${DOTFILES_BASH_LOADED:-}" ]]; then
+content='if [[ -z "${DOTFILES_BASH_LOADED:-}" ]]; then
 DOTFILES_BASH_LOADED=1
 case ":$PATH:" in
   *":${XDG_BIN_HOME:-$HOME/.local/bin}:"*) ;;
@@ -39,10 +43,15 @@ export BAT_THEME="gruvbox-dark"
 if [[ $- == *i* ]]; then
   [[ -f "$HOME/.bash_aliases" ]] && . "$HOME/.bash_aliases"
   . "$HOME/.config/rjaegers-dotfiles/bash-aliases"
-  command -v zoxide >/dev/null && eval "$(zoxide init bash)"
-  command -v starship >/dev/null && eval "$(starship init bash)"
+  command -v zoxide >/dev/null && eval "$(zoxide init bash)"'
+if [[ ! -f "$rc" ]] || ! grep -Fxq 'eval "$(starship init bash)"' "$rc"; then
+    content="$content"'
+  command -v starship >/dev/null && eval "$(starship init bash)"'
+fi
+content="$content"'
 fi
 fi'
+append_block "$rc" "$content"
 
 # A login shell must load .bashrc, but do not replace a user's existing profile.
 # Without .bash_profile, Bash reads .profile (which usually sources .bashrc).

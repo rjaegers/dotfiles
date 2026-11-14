@@ -1,0 +1,118 @@
+import importlib.util
+import os
+from pathlib import Path
+import platform
+import subprocess
+import tempfile
+import unittest
+from unittest import mock
+
+
+ROOT = Path(__file__).resolve().parents[1]
+spec = importlib.util.spec_from_file_location("install_tools", ROOT / "scripts/install-tools.py")
+install_tools = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(install_tools)
+
+
+class ToolInstallationTests(unittest.TestCase):
+    def test_macos_installs_only_missing_homebrew_formulae(self):
+        installed = {"brew", "starship", "eza", "bat", "fd", "zoxide", "dust"}
+        with (
+            mock.patch.object(install_tools.platform, "system", return_value="Darwin"),
+            mock.patch.object(install_tools.shutil, "which", side_effect=lambda name: name if name in installed else None),
+            mock.patch.object(install_tools.subprocess, "run") as run,
+        ):
+            install_tools.main()
+        run.assert_called_once_with(["brew", "install", "ripgrep", "git-delta"], check=True)
+
+    def test_linux_still_installs_verified_tools_and_herdr(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with (
+                mock.patch.object(install_tools.platform, "system", return_value="Linux"),
+                mock.patch.object(install_tools.platform, "machine", return_value="aarch64"),
+                mock.patch.dict(os.environ, {"XDG_BIN_HOME": directory}),
+                mock.patch.object(install_tools, "install") as install,
+                mock.patch.object(install_tools, "install_herdr") as herdr,
+            ):
+                install_tools.main()
+            self.assertEqual(install.call_count, len(install_tools.TOOLS))
+            herdr.assert_called_once_with("aarch64", Path(directory))
+
+    def test_macos_requires_homebrew_for_missing_tools(self):
+        with (
+            mock.patch.object(install_tools.platform, "system", return_value="Darwin"),
+            mock.patch.object(install_tools.shutil, "which", return_value=None),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "Homebrew"):
+                install_tools.main()
+
+
+@unittest.skipUnless(platform.system() == "Darwin", "macOS integration test")
+class DotbotIntegrationTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        root = Path(self.temp.name)
+        self.home = root / "home"
+        self.home.mkdir()
+        bin_dir = root / "bin"
+        bin_dir.mkdir()
+        for command, _ in install_tools.MACOS_TOOLS:
+            executable = bin_dir / command
+            executable.write_text("#!/bin/sh\nexit 0\n")
+            executable.chmod(0o755)
+        self.env = {
+            **os.environ,
+            "HOME": str(self.home),
+            "PATH": f"{bin_dir}:/usr/bin:/bin:/usr/sbin:/sbin",
+        }
+
+    def dotbot(self):
+        return subprocess.run(
+            [str(ROOT / "dotbot/bin/dotbot"), "-d", str(ROOT), "-c", "install.conf.yaml"],
+            cwd=ROOT,
+            env=self.env,
+            text=True,
+            capture_output=True,
+        )
+
+    def test_dotbot_configures_both_shells_without_overwriting_existing_setup(self):
+        zshrc = self.home / ".zshrc"
+        zshrc.write_text('export EXISTING_SETTING=yes\neval "$(starship init zsh)"\n')
+        bashrc = self.home / ".bashrc"
+        bashrc.write_text('eval "$(starship init bash)"\n')
+        for _ in range(2):
+            result = self.dotbot()
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("export EXISTING_SETTING=yes", zshrc.read_text())
+        self.assertEqual(zshrc.read_text().count('eval "$(starship init zsh)"'), 1)
+        self.assertEqual(bashrc.read_text().count('eval "$(starship init bash)"'), 1)
+        self.assertEqual(zshrc.read_text().count("# BEGIN rjaegers/dotfiles"), 1)
+        self.assertEqual(bashrc.read_text().count("# BEGIN rjaegers/dotfiles"), 1)
+        for path in (".config/starship.toml", ".config/eza/theme.yml", ".config/rjaegers-dotfiles/bash-aliases"):
+            self.assertTrue((self.home / path).is_file())
+        for shell, command in (("zsh", ["zsh", "-ic", "alias ls"]), ("bash", ["bash", "--rcfile", str(bashrc), "-ic", "alias ls"])):
+            result = subprocess.run(command, env=self.env, text=True, capture_output=True)
+            self.assertEqual(result.returncode, 0, f"{shell}: {result.stderr}")
+            self.assertIn("eza", result.stdout)
+
+    def test_bash_migrates_old_managed_symlinks_on_macos(self):
+        (self.home / ".bash_profile").symlink_to(ROOT / "configs/bash/bash-profile")
+        (self.home / ".bash_aliases").symlink_to(ROOT / "configs/bash/bash-aliases")
+        result = self.dotbot()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertFalse((self.home / ".bash_profile").is_symlink())
+        self.assertFalse((self.home / ".bash_aliases").is_symlink())
+        self.assertIn(".bashrc", (self.home / ".profile").read_text())
+
+    def test_incomplete_zsh_block_is_reported(self):
+        zshrc = self.home / ".zshrc"
+        zshrc.write_text("# BEGIN rjaegers/dotfiles\nexisting content\n")
+        result = self.dotbot()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Incomplete dotfiles block", result.stdout + result.stderr)
+        self.assertEqual(zshrc.read_text(), "# BEGIN rjaegers/dotfiles\nexisting content\n")
+
+
+if __name__ == "__main__":
+    unittest.main()
