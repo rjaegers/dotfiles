@@ -80,20 +80,17 @@ def install_herdr(arch, bin_dir, system):
     write_binary("herdr", binary, bin_dir)
 
 
-def install(name, repository, asset_pattern, arch, bin_dir):
-    destination = bin_dir / name
-    if destination.is_file() and os.access(destination, os.X_OK):
-        print(f"{name}: already installed at {destination}", flush=True)
-        return
-
-    release = json.loads(
-        download(f"https://api.github.com/repos/{repository}/releases/latest")
-    )
+def release_asset(release, asset_pattern, arch):
     version = release["tag_name"].removeprefix("v")
     asset_name = asset_pattern.format(version=version, tag=release["tag_name"], arch=arch)
     asset = next(
         (item for item in release["assets"] if item["name"] == asset_name), None
     )
+    return asset_name, asset
+
+
+def release_binary(name, repository, release, asset_pattern, arch):
+    asset_name, asset = release_asset(release, asset_pattern, arch)
     if asset is None or not (asset.get("digest") or "").startswith("sha256:"):
         raise RuntimeError(f"{repository} has no verified release asset {asset_name}")
 
@@ -117,7 +114,52 @@ def install(name, repository, asset_pattern, arch, bin_dir):
             binary = tar.extractfile(candidates[0])
             if binary is None:
                 raise RuntimeError(f"{name}: cannot read binary from {asset_name}")
-            write_binary(name, binary.read(), bin_dir)
+            return binary.read()
+
+
+def executable_works(name, binary, bin_dir):
+    with tempfile.TemporaryDirectory(dir=bin_dir) as directory:
+        candidate = (Path(directory) / name).resolve()
+        candidate.write_bytes(binary)
+        candidate.chmod(0o755)
+        try:
+            result = subprocess.run(
+                [str(candidate), "--version"], cwd=directory,
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return False
+        return result.returncode == 0
+
+
+def install(name, repository, asset_pattern, arch, bin_dir):
+    destination = bin_dir / name
+    if destination.is_file() and os.access(destination, os.X_OK):
+        print(f"{name}: already installed at {destination}", flush=True)
+        return
+
+    release = json.loads(
+        download(f"https://api.github.com/repos/{repository}/releases/latest")
+    )
+    binary = release_binary(name, repository, release, asset_pattern, arch)
+    if name == "fd" and not executable_works(name, binary, bin_dir):
+        print(f"fd: {release['tag_name']} cannot run; looking for a compatible release", flush=True)
+        releases = json.loads(
+            download(f"https://api.github.com/repos/{repository}/releases?per_page=100")
+        )
+        for candidate in releases:
+            if candidate["tag_name"] == release["tag_name"] or candidate.get("draft") or candidate.get("prerelease"):
+                continue
+            _, asset = release_asset(candidate, asset_pattern, arch)
+            if not asset or not (asset.get("digest") or "").startswith("sha256:"):
+                continue
+            binary = release_binary(name, repository, candidate, asset_pattern, arch)
+            if executable_works(name, binary, bin_dir):
+                print(f"fd: using compatible release {candidate['tag_name']}", flush=True)
+                break
+        else:
+            raise RuntimeError("fd: no compatible verified release found")
+    write_binary(name, binary, bin_dir)
 
 
 def main():

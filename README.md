@@ -36,3 +36,7 @@ the old dotfiles-managed `~/.bash_profile` and `~/.bash_aliases` symlinks and
 configures the existing login profile to source `.bashrc`.
 Other existing profile content is preserved. The managed blocks are added
 only once, so rerunning the installer is safe.
+
+The latest `fd` release is checked before installation; if it cannot start
+(for example, under x86 emulation), the installer tries earlier verified
+releases and uses the newest one that works.
